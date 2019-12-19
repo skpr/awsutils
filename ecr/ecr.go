@@ -1,14 +1,13 @@
 package ecr
 
 import (
+	"fmt"
 	"strings"
 
 	"github.com/aws/aws-sdk-go/aws"
 	"github.com/aws/aws-sdk-go/aws/credentials"
 	"github.com/aws/aws-sdk-go/aws/session"
 	"github.com/aws/aws-sdk-go/service/ecr"
-	docker "github.com/fsouza/go-dockerclient"
-	"github.com/pkg/errors"
 )
 
 // Username to pass to the Docker registry.
@@ -22,36 +21,33 @@ func IsRegistry(registry string) bool {
 
 // UpgradeAuth to use an AWS IAM token for authentication..
 // https://docs.aws.amazon.com/cli/latest/reference/ecr/get-login.html
-func UpgradeAuth(url string, auth docker.AuthConfiguration) (docker.AuthConfiguration, error) {
+func UpgradeAuth(url, username, password string) (string, string, error) {
 	region, err := extractRegionFromURL(url)
 	if err != nil {
-		return auth, errors.Wrap(err, "failed to determine registry region")
+		return "", "", fmt.Errorf("failed to determine registry region: %w", err)
 	}
 
 	sess, err := session.NewSession(&aws.Config{
 		Region:      aws.String(region),
-		Credentials: credentials.NewStaticCredentials(auth.Username, auth.Password, ""),
+		Credentials: credentials.NewStaticCredentials(username, password, ""),
 	})
 	if err != nil {
-		return auth, errors.Wrap(err, "failed to get session")
+		return "", "", fmt.Errorf( "failed to get session: %w", err)
 	}
 
 	res, err := ecr.New(sess).GetAuthorizationToken(&ecr.GetAuthorizationTokenInput{})
 	if err != nil {
-		return auth, err
+		return "", "", fmt.Errorf("failed get authorization token: %w", err)
 	}
 
 	if len(res.AuthorizationData) == 0 {
-		return auth, errors.New("failed get authorization token")
+		return "", "", fmt.Errorf("no authorization token was found")
 	}
 
-	password, err := decodeAuthorizationToken(aws.StringValue(res.AuthorizationData[0].AuthorizationToken))
+	token, err := decodeAuthorizationToken(aws.StringValue(res.AuthorizationData[0].AuthorizationToken))
 	if err != nil {
-		return auth, errors.Wrap(err, "failed to decode authorization token")
+		return "", "", fmt.Errorf("failed to decode authorization token: %w", err)
 	}
 
-	auth.Username = Username
-	auth.Password = password
-
-	return auth, nil
+	return Username, token, nil
 }
