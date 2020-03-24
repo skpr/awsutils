@@ -8,7 +8,7 @@ import (
 	"github.com/aws/aws-sdk-go/aws/session"
 	"github.com/aws/aws-sdk-go/service/eks"
 	"github.com/aws/aws-sdk-go/service/sts"
-	"github.com/kubernetes-sigs/aws-iam-authenticator/pkg/token"
+	"sigs.k8s.io/aws-iam-authenticator/pkg/token"
 	"github.com/pkg/errors"
 	"k8s.io/client-go/rest"
 )
